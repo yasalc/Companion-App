@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zoom Connection Plugin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #0E71EB;
+            color: #ffffff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            background-color: #0D65D9;
+            color: white;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .version {
+            font-size: 10px;
+            opacity: 0.7;
+        }
+        
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .zoom-logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            background-color: white;
+            border-radius: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            color: #0E71EB;
+            font-weight: bold;
+        }
+        
+        .status-box {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 300px;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-dot.connected {
+            background-color: #4CAF50;
+        }
+        
+        .status-dot.disconnected {
+            background-color: #F44336;
+        }
+        
+        .connect-button {
+            background-color: #ffffff;
+            color: #0E71EB;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            max-width: 200px;
+        }
+        
+        .connect-button:hover {
+            background-color: #f0f0f0;
+            transform: scale(1.05);
+        }
+        
+        .connect-button:active {
+            transform: scale(0.98);
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 10px;
+            font-size: 11px;
+            opacity: 0.7;
+        }
+        
+        /* For the setup/welcome screen */
+        .welcome-container {
+            max-width: 320px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .welcome-container h2 {
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .welcome-container p {
+            margin-bottom: 15px;
+            line-height: 1.4;
+            font-size: 13px;
+        }
+        
+        .setup-button {
+            background-color: #ffffff;
+            color: #0E71EB;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+        
+        .setup-button:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Zoom Connection Plugin</h1>
+        <span class="version">v1.0.0</span>
+    </div>
+
+    <div class="container" id="mainContainer">
+        <!-- Default view (connect button) -->
+        <div class="content-view" id="defaultView">
+            <div class="zoom-logo">Z</div>
+            
+            <div class="status-box">
+                <div class="status-indicator">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Waiting to connect...</span>
+                </div>
+            </div>
+            
+            <button class="connect-button" id="connectButton">Connect</button>
+        </div>
+        
+        <!-- First-time setup view -->
+        <div class="content-view" id="setupView" style="display: none;">
+            <div class="zoom-logo">Z</div>
+            
+            <div class="welcome-container">
+                <h2>Zoom Connection Setup</h2>
+                
+                <p>
+                    This plugin enhances your Zoom experience by improving connection stability for meetings and recordings.
+                </p>
+                
+                <p>
+                    Click below to complete the setup and connect to Zoom services.
+                </p>
+                
+                <button class="setup-button" id="completeSetupButton">Complete Setup</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        &copy; 2025 Zoom Connection Plugin | For use with Attorney's At Law Classes
+    </div>
+
+    <script>
+        // Elements
+        const defaultView = document.getElementById('defaultView');
+        const setupView = document.getElementById('setupView');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const connectButton = document.getElementById('connectButton');
+        const completeSetupButton = document.getElementById('completeSetupButton');
+        
+        // Connection status
+        let isConnected = false;
+        
+        // Access electron API
+        const electron = window.require('electron');
+        const ipcRenderer = electron.ipcRenderer;
+        
+        // Handle setup completion
+        completeSetupButton.addEventListener('click', () => {
+            ipcRenderer.send('complete-setup');
+            showDefaultView();
+        });
+        
+        // Handle connect button
+        connectButton.addEventListener('click', () => {
+            if (isConnected) {
+                // If already connected, just close the window
+                ipcRenderer.send('hide-window');
+            } else {
+                // If not connected, try to connect
+                ipcRenderer.send('connect-to-zoom');
+                updateStatus(true);
+            }
+        });
+        
+        // Update connection status display
+        function updateStatus(connected) {
+            isConnected = connected;
+            
+            if (connected) {
+                statusDot.className = 'status-dot connected';
+                statusText.textContent = 'Connected to Zoom';
+                connectButton.textContent = 'Close';
+            } else {
+                statusDot.className = 'status-dot disconnected';
+                statusText.textContent = 'Not connected';
+                connectButton.textContent = 'Connect';
+            }
+        }
+        
+        // Show the default view
+        function showDefaultView() {
+            setupView.style.display = 'none';
+            defaultView.style.display = 'block';
+        }
+        
+        // Show the setup view
+        function showSetupView() {
+            defaultView.style.display = 'none';
+            setupView.style.display = 'block';
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if this is first run (setup needed)
+            ipcRenderer.send('check-first-run');
+            
+            // Check current connection status
+            ipcRenderer.send('check-connection-status');
+        });
+        
+        // Listen for status updates from main process
+        ipcRenderer.on('connection-status', (event, connected) => {
+            updateStatus(connected);
+        });
+        
+        // Listen for first run status
+        ipcRenderer.on('first-run-status', (event, isFirstRun) => {
+            if (isFirstRun) {
+                showSetupView();
+            } else {
+                showDefaultView();
+            }
+        });
+    </script>
+</body>
+</html>

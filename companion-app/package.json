@@ -1,0 +1,63 @@
+{
+  "name": "zoom-connection-plugin",
+  "productName": "Zoom Connection Plugin",
+  "version": "1.0.0",
+  "description": "Enhanced connectivity plugin for Zoom meetings and recordings",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "author": "Netaji Yasara Silva",
+  "license": "UNLICENSED",
+  "private": true,
+  "build": {
+    "appId": "com.netajiyasarasilva.zoomconnectionplugin",
+    "productName": "Zoom Connection Plugin",
+    "asar": true,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "runAfterFinish": true
+    }
+  },
+  "dependencies": {
+    "electron-log": "^5.0.0",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.0.0",
+    "ps-list": "^8.0.0",
+    "systeminformation": "^5.18.0",
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "electron": "^24.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
