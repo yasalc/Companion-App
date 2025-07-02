@@ -15,6 +15,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     
     strategy:
+      fail-fast: false  # Don't cancel other jobs if one fails
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     
@@ -29,25 +30,27 @@ jobs:
         cache: 'npm'
         cache-dependency-path: companion-app/package.json
     
+    - name: Install system dependencies (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libgtk-3-dev libxss1 libasound2-dev
+    
     - name: Install dependencies
       run: |
         cd companion-app
         npm install --verbose
     
     - name: Create build directory and icons
+      shell: bash
       run: |
         cd companion-app
         mkdir -p build
         # Copy tray icon as placeholder for all platforms
         cp assets/tray-icon.png build/icon.png
-    
-    - name: Create platform-specific icons
-      shell: bash
-      run: |
-        cd companion-app/build
-        # Create placeholder icons for all platforms
-        cp icon.png icon.ico  # Windows
-        cp icon.png icon.icns # macOS
+        # Create platform-specific icons
+        cp build/icon.png build/icon.ico  # Windows
+        cp build/icon.png build/icon.icns # macOS
     
     - name: Debug - List files before build
       run: |
@@ -82,6 +85,10 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: |
         cd companion-app
+        # Set up virtual display for Linux build
+        export DISPLAY=:99
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        sleep 3
         npm run build:linux
       env:
         CI: true
@@ -91,9 +98,13 @@ jobs:
       run: |
         cd companion-app
         echo "=== Final directory structure ==="
-        find . -type f -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" || echo "No installer files found"
+        find . -type f -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" 2>/dev/null || echo "No installer files found"
         echo "=== Dist directory contents ==="
-        ls -la dist/ || echo "No dist directory found"
+        ls -la dist/ 2>/dev/null || echo "No dist directory found"
+        if [ -d "dist" ]; then
+          echo "=== Nested dist contents ==="
+          find dist/ -type f 2>/dev/null || echo "No files in dist"
+        fi
     
     - name: Upload Windows artifacts
       if: matrix.os == 'windows-latest'
@@ -149,9 +160,12 @@ jobs:
       run: |
         echo "=== Downloaded artifacts structure ==="
         find . -type f 2>/dev/null || echo "No files found"
+        echo "=== Available artifact directories ==="
+        ls -la . 2>/dev/null || echo "No directories found"
     
-    - name: Create Release
+    - name: Create Release (only if artifacts exist)
       id: create_release
+      if: hashFiles('**/*.exe') != '' || hashFiles('**/*.dmg') != '' || hashFiles('**/*.AppImage') != ''
       uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -185,6 +199,6 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          windows-installer/**/*.exe
-          macos-installer/**/*.dmg
-          linux-installer/**/*.AppImage
+          **/*.exe
+          **/*.dmg
+          **/*.AppImage
