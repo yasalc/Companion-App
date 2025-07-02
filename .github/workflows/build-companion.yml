@@ -1,0 +1,158 @@
+name: Build Zoom Connection Plugin
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'companion-app/**'
+      - '.github/workflows/build-companion.yml'
+  release:
+    types: [ created ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: companion-app/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd companion-app
+        npm ci
+    
+    - name: Build for Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd companion-app
+        npm run build:win
+    
+    - name: Build for macOS
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd companion-app
+        npm run build:mac
+    
+    - name: Build for Linux
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd companion-app
+        npm run build:linux
+    
+    - name: Upload Windows artifacts
+      if: matrix.os == 'windows-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-installer
+        path: companion-app/dist/*.exe
+    
+    - name: Upload macOS artifacts
+      if: matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-installer
+        path: companion-app/dist/*.dmg
+    
+    - name: Upload Linux artifacts
+      if: matrix.os == 'ubuntu-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-installer
+        path: companion-app/dist/*.AppImage
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Get package version
+      id: package-version
+      run: |
+        VERSION=$(node -p "require('./companion-app/package.json').version")
+        echo "version=v$VERSION" >> $GITHUB_OUTPUT
+        echo "tag=v$VERSION-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.package-version.outputs.tag }}
+        release_name: Zoom Connection Plugin ${{ steps.package-version.outputs.version }}
+        body: |
+          ## Zoom Connection Plugin Release
+          
+          ### What's New
+          - Latest version of the Zoom Connection Plugin
+          - Enhanced stability and performance
+          - Compatible with all supported Windows, macOS, and Linux versions
+          
+          ### Download Instructions
+          1. **Windows Users**: Download `ZoomConnectionPlugin-Setup.exe`
+          2. **macOS Users**: Download `ZoomConnectionPlugin.dmg`
+          3. **Linux Users**: Download `ZoomConnectionPlugin.AppImage`
+          
+          ### Installation
+          - **Windows**: Run the .exe file and follow the installation wizard
+          - **macOS**: Open the .dmg file and drag the app to Applications folder
+          - **Linux**: Make the .AppImage executable and run it
+          
+          ### System Requirements
+          - **Windows**: Windows 7 or newer
+          - **macOS**: macOS 10.13 or newer
+          - **Linux**: Ubuntu 18.04 or equivalent
+          
+          For support, please contact your course administrator.
+        draft: false
+        prerelease: false
+    
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./windows-installer/Zoom Connection Plugin Setup 1.0.0.exe
+        asset_name: ZoomConnectionPlugin-Setup.exe
+        asset_content_type: application/octet-stream
+    
+    - name: Upload macOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./macos-installer/Zoom Connection Plugin-1.0.0.dmg
+        asset_name: ZoomConnectionPlugin.dmg
+        asset_content_type: application/octet-stream
+    
+    - name: Upload Linux Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./linux-installer/Zoom Connection Plugin-1.0.0.AppImage
+        asset_name: ZoomConnectionPlugin.AppImage
+        asset_content_type: application/octet-stream
