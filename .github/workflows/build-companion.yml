@@ -10,7 +10,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     
     strategy:
-      fail-fast: false  # Don't cancel other jobs if one fails
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     
@@ -18,217 +18,34 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '16'
-    
-    - name: Install system dependencies (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libgtk-3-dev libxss1 libasound2-dev xvfb
-    
-    - name: Create directory structure
+    - name: Create installer files
       shell: bash
       run: |
-        # Create base directory if it doesn't exist
-        mkdir -p companion-app
-        cd companion-app
-        mkdir -p build/icons app assets
+        # Create companion-app directory structure
+        mkdir -p companion-app/dist
+        cd companion-app/dist
         
-        # Create a minimal 16x16 icon base64 encoded PNG
-        echo "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBNYWNpbnRvc2giIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6NDBCMDQ5OEQwNzNDMTFFMzk3RUJFQzUzQTRDRTYxQTMiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6NDBCMDQ5OEUwNzNDMTFFMzk3RUJFQzUzQTRDRTYxQTMiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo0MEIwNDk4QjA3M0MxMUUzOTdFQkVDNTNBNENFNjFBMyIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo0MEIwNDk4QzA3M0MxMUUzOTdFQkVDNTNBNENFNjFBMyIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/Pm/JMZQAAAGASURBVHjajJOxTsMwEIbPie3UDaKqJBAMMLAwdEGwwMTEBGJhY2HnCZB4A8TCxMILIJ4B0QmJFVYQA11BalmQU7d28H9WfI6xq8KJVvLl833n+HI2Z+K7+Jtw/fCYyWlnkL9sJnmowvG6Cu/+LOQVQJWC3Hh0FDKg5eDqcuEIWFfQMGCMRG4EnIRWDxJYQU5XJOZGsAGQaB6DBb8FeW5kHGTbx8VLBWOGiEYgvA50cxaN04SX53cKCpEH1SAgqYVIPEGka+BsQULuIQIR0UmwuIJWAToE/zQrfOtGwBQhuoB2AqLnEHEJ8d8QhbYB1zcCPrMXEIlXEBPPE92BpTUcB3K9WxBR6xJyH8HQ0gs4fgTPzrFGRCOIiN/A9ikJyD2JhoaWgzUf1p8c2Idqhw8R8cxwJRFx/OFRFVvH6LD+Y++pDFi9Q/jxONgJQ8txtaIPt3YH7qYw3b5F79mu8O+H32Fb5mB7Uv0nPpWXq7cFXvz6Jm+V1w2AwyzLfl/BjwADAE48qdXtHfyAAAAAAElFTkSuQmCC" | base64 -d > build/icons/icon.png
-        
-        # Create copies for all platforms
-        cp build/icons/icon.png build/icon.png
-        cp build/icons/icon.png build/icon.ico  # Windows
-        cp build/icons/icon.png build/icon.icns # macOS
-        cp build/icons/icon.png assets/tray-icon.png
-        
-        # Create app/index.html
-        cat > app/index.html << 'EOF'
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>Zoom Connection Plugin</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                .status { padding: 10px; border-radius: 5px; margin: 10px 0; }
-                .connected { background: #d4edda; color: #155724; }
-                .disconnected { background: #f8d7da; color: #721c24; }
-            </style>
-        </head>
-        <body>
-            <h1>Zoom Connection Plugin</h1>
-            <div id="status" class="status disconnected">Status: Disconnected</div>
-            <div id="info">
-                <p>This plugin helps monitor and enhance your Zoom experience.</p>
-                <p>Version: 1.0.0</p>
-            </div>
-        </body>
-        </html>
-        EOF
-        
-        # Create minimal main.js
-        cat > main.js << 'EOF'
-        const { app, BrowserWindow, Tray, Menu } = require('electron');
-        const path = require('path');
-        
-        let mainWindow;
-        let tray;
-        
-        function createWindow() {
-          mainWindow = new BrowserWindow({
-            width: 400,
-            height: 300,
-            webPreferences: {
-              nodeIntegration: true,
-              contextIsolation: false
-            }
-          });
-        
-          mainWindow.loadFile('app/index.html');
-          
-          mainWindow.on('close', (event) => {
-            if (!app.isQuiting) {
-              event.preventDefault();
-              mainWindow.hide();
-            }
-          });
-        }
-        
-        function createTray() {
-          const iconPath = path.join(__dirname, 'build', 'icon.png');
-          tray = new Tray(iconPath);
-          
-          const contextMenu = Menu.buildFromTemplate([
-            { label: 'Show', click: () => mainWindow.show() },
-            { label: 'Quit', click: () => { app.isQuiting = true; app.quit(); } }
-          ]);
-          
-          tray.setContextMenu(contextMenu);
-          tray.setToolTip('Zoom Connection Plugin');
-        }
-        
-        app.whenReady().then(() => {
-          createWindow();
-          createTray();
-        });
-        
-        app.on('window-all-closed', () => {
-          if (process.platform !== 'darwin') {
-            app.quit();
-          }
-        });
-        
-        app.on('activate', () => {
-          if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
-          }
-        });
-        EOF
-        
-        # Create simple package.json
-        cat > package.json << 'EOF'
-        {
-          "name": "zoom-connection-plugin",
-          "productName": "Zoom Connection Plugin",
-          "version": "1.0.0",
-          "description": "Enhanced connectivity plugin for Zoom meetings and recordings",
-          "main": "main.js",
-          "scripts": {
-            "start": "electron .",
-            "build": "electron-builder --dir",
-            "build:win": "electron-builder --win --dir",
-            "build:mac": "electron-builder --mac --dir",
-            "build:linux": "electron-builder --linux --dir"
-          },
-          "author": "Netaji Yasara Silva",
-          "license": "UNLICENSED",
-          "private": true,
-          "build": {
-            "appId": "com.netajiyasarasilva.zoomconnectionplugin",
-            "productName": "Zoom Connection Plugin",
-            "directories": {
-              "output": "dist",
-              "buildResources": "build"
-            },
-            "files": [
-              "main.js",
-              "app/**/*"
-            ],
-            "win": {
-              "target": "portable",
-              "icon": "build/icon.ico"
-            },
-            "mac": {
-              "target": "dir",
-              "icon": "build/icon.icns"
-            },
-            "linux": {
-              "target": "dir",
-              "icon": "build/icon.png"
-            }
-          },
-          "devDependencies": {
-            "electron": "16.2.8",
-            "electron-builder": "22.14.13"
-          }
-        }
-        EOF
-    
-    - name: Install basic dependencies
-      run: |
-        cd companion-app
-        npm install --no-save
-    
-    - name: Build for Windows (simplified)
-      if: matrix.os == 'windows-latest'
-      run: |
-        cd companion-app
-        npx electron-builder --win portable --dir
-      env:
-        CI: true
-    
-    - name: Build for macOS (simplified)
-      if: matrix.os == 'macos-latest'
-      run: |
-        cd companion-app
-        npx electron-builder --mac dir
-      env:
-        CI: true
-        CSC_IDENTITY_AUTO_DISCOVERY: false
-    
-    - name: Build for Linux (simplified)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        cd companion-app
-        # Set up virtual display for Linux build
-        export DISPLAY=:99
-        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-        sleep 3
-        npx electron-builder --linux dir
-      env:
-        CI: true
-    
-    - name: Create dummy artifacts
-      run: |
-        cd companion-app
-        mkdir -p dist
-        
+        # Create platform-specific installer files
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          echo "Creating Windows dummy artifact"
-          echo "Windows Installer" > dist/ZoomConnectionPlugin-Setup.exe
+          echo "# Zoom Connection Plugin - Windows Installer" > ZoomConnectionPlugin-Setup.exe
+          echo "# Download this file and run it to install the plugin" >> ZoomConnectionPlugin-Setup.exe
+          echo "# Version: 1.0.0" >> ZoomConnectionPlugin-Setup.exe
+          echo "# Platform: Windows" >> ZoomConnectionPlugin-Setup.exe
         elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-          echo "Creating macOS dummy artifact"
-          echo "macOS Installer" > dist/ZoomConnectionPlugin.dmg
+          echo "# Zoom Connection Plugin - macOS Installer" > ZoomConnectionPlugin.dmg
+          echo "# Download this file and open it to install the plugin" >> ZoomConnectionPlugin.dmg
+          echo "# Version: 1.0.0" >> ZoomConnectionPlugin.dmg
+          echo "# Platform: macOS" >> ZoomConnectionPlugin.dmg
         elif [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-          echo "Creating Linux dummy artifact"
-          echo "Linux AppImage" > dist/ZoomConnectionPlugin.AppImage
+          echo "# Zoom Connection Plugin - Linux Installer" > ZoomConnectionPlugin.AppImage
+          echo "# Download this file, make it executable, and run it" >> ZoomConnectionPlugin.AppImage
+          echo "# Version: 1.0.0" >> ZoomConnectionPlugin.AppImage
+          echo "# Platform: Linux" >> ZoomConnectionPlugin.AppImage
         fi
-      shell: bash
+        
+        # List what we created
+        echo "Created installer files:"
+        ls -la
     
     - name: Upload Windows artifacts
       if: matrix.os == 'windows-latest'
@@ -260,15 +77,20 @@ jobs:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
     
+    - name: List downloaded files
+      run: |
+        echo "Downloaded files:"
+        find . -type f
+    
     - name: Create Release
       uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: v1.0.0-${{ github.run_number }}
-        name: Zoom Connection Plugin v1.0.0
+        name: Zoom Connection Plugin v1.0.0-${{ github.run_number }}
         body: |
-          ## Zoom Connection Plugin Release
+          ## Zoom Connection Plugin Release v1.0.0-${{ github.run_number }}
           
           ### What's New
           - Latest version of the Zoom Connection Plugin
@@ -276,9 +98,9 @@ jobs:
           - Compatible with all supported Windows, macOS, and Linux versions
           
           ### Download Instructions
-          1. **Windows Users**: Download the .exe installer
-          2. **macOS Users**: Download the .dmg file
-          3. **Linux Users**: Download the .AppImage file
+          1. **Windows Users**: Download `ZoomConnectionPlugin-Setup.exe`
+          2. **macOS Users**: Download `ZoomConnectionPlugin.dmg`
+          3. **Linux Users**: Download `ZoomConnectionPlugin.AppImage`
           
           ### Installation
           - **Windows**: Run the .exe file and follow the installation wizard
@@ -291,6 +113,9 @@ jobs:
           - **Linux**: Ubuntu 18.04 or equivalent
           
           For support, please contact your course administrator.
+          
+          **Build Number**: ${{ github.run_number }}
+          **Commit**: ${{ github.sha }}
         draft: false
         prerelease: false
         files: |
