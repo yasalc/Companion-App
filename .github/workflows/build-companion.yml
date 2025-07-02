@@ -32,81 +32,77 @@ jobs:
     - name: Install dependencies
       run: |
         cd companion-app
-        npm install
+        npm install --verbose
     
-    - name: Create build directory
+    - name: Create build directory and icons
       run: |
         cd companion-app
         mkdir -p build
-    
-    - name: Copy icon files
-      run: |
-        cd companion-app
-        # Copy tray icon as placeholder icons for builds
+        # Copy tray icon as placeholder for all platforms
         cp assets/tray-icon.png build/icon.png
     
-    - name: Create Windows icon (placeholder)
-      if: matrix.os == 'windows-latest'
+    - name: Create platform-specific icons
+      shell: bash
       run: |
         cd companion-app/build
-        # For Windows, we'll just copy the PNG as placeholder since no .ico exists
-        cp icon.png icon.ico
+        # Create placeholder icons for all platforms
+        cp icon.png icon.ico  # Windows
+        cp icon.png icon.icns # macOS
     
-    - name: Create macOS icon (placeholder)
-      if: matrix.os == 'macos-latest'
+    - name: Debug - List files before build
       run: |
-        cd companion-app/build
-        # For macOS, we'll just copy the PNG as placeholder since no .icns exists
-        cp icon.png icon.icns
+        cd companion-app
+        echo "=== Current directory contents ==="
+        ls -la
+        echo "=== Build directory contents ==="
+        ls -la build/ || echo "No build directory"
+        echo "=== Package.json contents ==="
+        cat package.json
     
     - name: Build for Windows
       if: matrix.os == 'windows-latest'
       run: |
         cd companion-app
         npm run build:win
+      env:
+        CI: true
+        DEBUG: electron-builder
     
     - name: Build for macOS
       if: matrix.os == 'macos-latest'
       run: |
         cd companion-app
         npm run build:mac
+      env:
+        CI: true
+        DEBUG: electron-builder
+        CSC_IDENTITY_AUTO_DISCOVERY: false
     
     - name: Build for Linux
       if: matrix.os == 'ubuntu-latest'
       run: |
         cd companion-app
         npm run build:linux
+      env:
+        CI: true
+        DEBUG: electron-builder
     
-    - name: List Windows build output
-      if: matrix.os == 'windows-latest'
+    - name: Debug - List build output
       run: |
         cd companion-app
-        echo "Contents of dist directory:"
+        echo "=== Final directory structure ==="
+        find . -type f -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" || echo "No installer files found"
+        echo "=== Dist directory contents ==="
         ls -la dist/ || echo "No dist directory found"
-        find . -name "*.exe" -type f || echo "No .exe files found"
-    
-    - name: List macOS build output
-      if: matrix.os == 'macos-latest'
-      run: |
-        cd companion-app
-        echo "Contents of dist directory:"
-        ls -la dist/ || echo "No dist directory found"
-        find . -name "*.dmg" -type f || echo "No .dmg files found"
-    
-    - name: List Linux build output
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        cd companion-app
-        echo "Contents of dist directory:"
-        ls -la dist/ || echo "No dist directory found"
-        find . -name "*.AppImage" -type f || echo "No .AppImage files found"
     
     - name: Upload Windows artifacts
       if: matrix.os == 'windows-latest'
       uses: actions/upload-artifact@v4
       with:
         name: windows-installer
-        path: companion-app/dist/*.exe
+        path: |
+          companion-app/dist/*.exe
+          companion-app/dist/**/*.exe
         if-no-files-found: warn
     
     - name: Upload macOS artifacts
@@ -114,7 +110,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: macos-installer
-        path: companion-app/dist/*.dmg
+        path: |
+          companion-app/dist/*.dmg
+          companion-app/dist/**/*.dmg
         if-no-files-found: warn
     
     - name: Upload Linux artifacts
@@ -122,7 +120,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: linux-installer
-        path: companion-app/dist/*.AppImage
+        path: |
+          companion-app/dist/*.AppImage
+          companion-app/dist/**/*.AppImage
         if-no-files-found: warn
 
   release:
@@ -145,20 +145,19 @@ jobs:
       uses: actions/download-artifact@v4
       continue-on-error: true
     
-    - name: List downloaded artifacts
+    - name: Debug - List downloaded artifacts
       run: |
-        echo "Downloaded artifacts:"
-        ls -la . || echo "No artifacts directory"
-        find . -type f || echo "No files found"
+        echo "=== Downloaded artifacts structure ==="
+        find . -type f 2>/dev/null || echo "No files found"
     
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.package-version.outputs.tag }}
-        release_name: Zoom Connection Plugin ${{ steps.package-version.outputs.version }}
+        name: Zoom Connection Plugin ${{ steps.package-version.outputs.version }}
         body: |
           ## Zoom Connection Plugin Release
           
@@ -185,39 +184,7 @@ jobs:
           For support, please contact your course administrator.
         draft: false
         prerelease: false
-    
-    - name: Find and upload Windows installer
-      if: hashFiles('./windows-installer/*.exe') != ''
-      run: |
-        EXE_FILE=$(find ./windows-installer -name "*.exe" | head -1)
-        if [ -n "$EXE_FILE" ]; then
-          echo "Found Windows installer: $EXE_FILE"
-          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-               -H "Content-Type: application/octet-stream" \
-               --data-binary @"$EXE_FILE" \
-               "${{ steps.create_release.outputs.upload_url }}?name=ZoomConnectionPlugin-Setup.exe"
-        fi
-    
-    - name: Find and upload macOS installer
-      if: hashFiles('./macos-installer/*.dmg') != ''
-      run: |
-        DMG_FILE=$(find ./macos-installer -name "*.dmg" | head -1)
-        if [ -n "$DMG_FILE" ]; then
-          echo "Found macOS installer: $DMG_FILE"
-          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-               -H "Content-Type: application/octet-stream" \
-               --data-binary @"$DMG_FILE" \
-               "${{ steps.create_release.outputs.upload_url }}?name=ZoomConnectionPlugin.dmg"
-        fi
-    
-    - name: Find and upload Linux installer
-      if: hashFiles('./linux-installer/*.AppImage') != ''
-      run: |
-        APPIMAGE_FILE=$(find ./linux-installer -name "*.AppImage" | head -1)
-        if [ -n "$APPIMAGE_FILE" ]; then
-          echo "Found Linux installer: $APPIMAGE_FILE"
-          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-               -H "Content-Type: application/octet-stream" \
-               --data-binary @"$APPIMAGE_FILE" \
-               "${{ steps.create_release.outputs.upload_url }}?name=ZoomConnectionPlugin.AppImage"
-        fi
+        files: |
+          windows-installer/**/*.exe
+          macos-installer/**/*.dmg
+          linux-installer/**/*.AppImage
