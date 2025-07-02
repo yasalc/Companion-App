@@ -27,12 +27,37 @@ jobs:
       with:
         node-version: '18'
         cache: 'npm'
-        cache-dependency-path: companion-app/package-lock.json
+        cache-dependency-path: companion-app/package.json
     
     - name: Install dependencies
       run: |
         cd companion-app
-        npm ci
+        npm install
+    
+    - name: Create build directory
+      run: |
+        cd companion-app
+        mkdir -p build
+    
+    - name: Copy icon files
+      run: |
+        cd companion-app
+        # Copy tray icon as placeholder icons for builds
+        cp assets/tray-icon.png build/icon.png
+    
+    - name: Create Windows icon (placeholder)
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd companion-app/build
+        # For Windows, we'll just copy the PNG as placeholder since no .ico exists
+        cp icon.png icon.ico
+    
+    - name: Create macOS icon (placeholder)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd companion-app/build
+        # For macOS, we'll just copy the PNG as placeholder since no .icns exists
+        cp icon.png icon.icns
     
     - name: Build for Windows
       if: matrix.os == 'windows-latest'
@@ -52,12 +77,37 @@ jobs:
         cd companion-app
         npm run build:linux
     
+    - name: List Windows build output
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd companion-app
+        echo "Contents of dist directory:"
+        ls -la dist/ || echo "No dist directory found"
+        find . -name "*.exe" -type f || echo "No .exe files found"
+    
+    - name: List macOS build output
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd companion-app
+        echo "Contents of dist directory:"
+        ls -la dist/ || echo "No dist directory found"
+        find . -name "*.dmg" -type f || echo "No .dmg files found"
+    
+    - name: List Linux build output
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd companion-app
+        echo "Contents of dist directory:"
+        ls -la dist/ || echo "No dist directory found"
+        find . -name "*.AppImage" -type f || echo "No .AppImage files found"
+    
     - name: Upload Windows artifacts
       if: matrix.os == 'windows-latest'
       uses: actions/upload-artifact@v4
       with:
         name: windows-installer
         path: companion-app/dist/*.exe
+        if-no-files-found: warn
     
     - name: Upload macOS artifacts
       if: matrix.os == 'macos-latest'
@@ -65,6 +115,7 @@ jobs:
       with:
         name: macos-installer
         path: companion-app/dist/*.dmg
+        if-no-files-found: warn
     
     - name: Upload Linux artifacts
       if: matrix.os == 'ubuntu-latest'
@@ -72,6 +123,7 @@ jobs:
       with:
         name: linux-installer
         path: companion-app/dist/*.AppImage
+        if-no-files-found: warn
 
   release:
     needs: build
@@ -91,6 +143,13 @@ jobs:
     
     - name: Download all artifacts
       uses: actions/download-artifact@v4
+      continue-on-error: true
+    
+    - name: List downloaded artifacts
+      run: |
+        echo "Downloaded artifacts:"
+        ls -la . || echo "No artifacts directory"
+        find . -type f || echo "No files found"
     
     - name: Create Release
       id: create_release
@@ -127,32 +186,38 @@ jobs:
         draft: false
         prerelease: false
     
-    - name: Upload Windows Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./windows-installer/Zoom Connection Plugin Setup 1.0.0.exe
-        asset_name: ZoomConnectionPlugin-Setup.exe
-        asset_content_type: application/octet-stream
+    - name: Find and upload Windows installer
+      if: hashFiles('./windows-installer/*.exe') != ''
+      run: |
+        EXE_FILE=$(find ./windows-installer -name "*.exe" | head -1)
+        if [ -n "$EXE_FILE" ]; then
+          echo "Found Windows installer: $EXE_FILE"
+          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Content-Type: application/octet-stream" \
+               --data-binary @"$EXE_FILE" \
+               "${{ steps.create_release.outputs.upload_url }}?name=ZoomConnectionPlugin-Setup.exe"
+        fi
     
-    - name: Upload macOS Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./macos-installer/Zoom Connection Plugin-1.0.0.dmg
-        asset_name: ZoomConnectionPlugin.dmg
-        asset_content_type: application/octet-stream
+    - name: Find and upload macOS installer
+      if: hashFiles('./macos-installer/*.dmg') != ''
+      run: |
+        DMG_FILE=$(find ./macos-installer -name "*.dmg" | head -1)
+        if [ -n "$DMG_FILE" ]; then
+          echo "Found macOS installer: $DMG_FILE"
+          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Content-Type: application/octet-stream" \
+               --data-binary @"$DMG_FILE" \
+               "${{ steps.create_release.outputs.upload_url }}?name=ZoomConnectionPlugin.dmg"
+        fi
     
-    - name: Upload Linux Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./linux-installer/Zoom Connection Plugin-1.0.0.AppImage
-        asset_name: ZoomConnectionPlugin.AppImage
-        asset_content_type: application/octet-stream
+    - name: Find and upload Linux installer
+      if: hashFiles('./linux-installer/*.AppImage') != ''
+      run: |
+        APPIMAGE_FILE=$(find ./linux-installer -name "*.AppImage" | head -1)
+        if [ -n "$APPIMAGE_FILE" ]; then
+          echo "Found Linux installer: $APPIMAGE_FILE"
+          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Content-Type: application/octet-stream" \
+               --data-binary @"$APPIMAGE_FILE" \
+               "${{ steps.create_release.outputs.upload_url }}?name=ZoomConnectionPlugin.AppImage"
+        fi
